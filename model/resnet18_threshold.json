@@ -1,0 +1,8 @@
+{
+  "threshold": 0.6854999661445618,
+  "image_size": [
+    224,
+    224
+  ],
+  "preprocessing": "otsu"
+}

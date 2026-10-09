@@ -1,0 +1,9 @@
+torch
+torchvision
+numpy
+Pillow
+scikit-learn
+matplotlib
+nbformat
+ipykernel
+opencv-python
