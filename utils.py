@@ -22,8 +22,6 @@ def set_seed(seed=42):
 def get_signature_paths(data_dir="dataset/process"):
     writers = {}
     for folder, key in [("full_org", "org"), ("full_forg", "forg")]:
-        if not (Path(data_dir) / folder).is_dir():
-            raise FileNotFoundError("Run datapreprocessing.ipynb to create dataset/process first.")
         for path in sorted((Path(data_dir) / folder).iterdir()):
             parts = path.stem.split("_")
             if not path.is_file() or path.suffix.lower() not in {".png", ".jpg", ".jpeg", ".bmp"}:
@@ -32,9 +30,6 @@ def get_signature_paths(data_dir="dataset/process"):
                 continue
             writer_id = int(parts[1])
             writers.setdefault(writer_id, {"org": [], "forg": []})[key].append(path)
-    for writer_id, images in writers.items():
-        if len(images["org"]) < 2 or not images["forg"]:
-            raise ValueError(f"Writer {writer_id} needs two genuine images and one forged image.")
     return writers
 
 
@@ -42,8 +37,6 @@ def split_writers(writers, seed=42):
     ids = sorted(writers)
     random.Random(seed).shuffle(ids)
     train, validation, test = ids[:40], ids[40:48], ids[48:]
-    if not train or not validation or not test:
-        raise ValueError("The 40/8/rest split needs at least 49 writers.")
     return train, validation, test
 
 
@@ -186,16 +179,6 @@ def test_pair_distances(model, name, pairs, config, device):
     return np.array(distances), np.array(labels)
 
 
-def calculate_triplet_metrics(distances, labels, margin=0.2):
-    positive = distances[labels == 1]
-    negative = distances[labels == 0]
-    return {
-        "triplet_loss": float(np.maximum(positive - negative + margin, 0).mean()),
-        "triplet_accuracy": float(np.mean(positive < negative)),
-        "margin_accuracy": float(np.mean(positive + margin <= negative)),
-    }
-
-
 def plot_history(history, name):
     if not history["train"]:
         return
@@ -234,14 +217,3 @@ def show_pairs(pairs, distances, labels, threshold, name, count=4):
             axes[row, 1].set_title(f"{pairs[index][1].name}\nActual: {actual} | Predicted: {predicted}\nDistance: {distances[index]:.4f}")
         plt.tight_layout(rect=[0, 0, 1, 0.96])
         plt.show()
-
-
-def plot_distances(distances, labels, threshold, name):
-    plt.hist(distances[labels == 1], bins=30, alpha=0.6, density=True, label="Genuine pairs")
-    plt.hist(distances[labels == 0], bins=30, alpha=0.6, density=True, label="Fake pairs")
-    plt.axvline(threshold, color="black", linestyle="--", label="Validation threshold")
-    plt.title(name)
-    plt.xlabel("Squared embedding distance")
-    plt.ylabel("Density")
-    plt.legend()
-    plt.show()
