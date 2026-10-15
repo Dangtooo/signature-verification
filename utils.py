@@ -82,13 +82,8 @@ def get_batches(triplets, image_size, batch_size=16, rgb=False):
         yield torch.stack(anchors), torch.stack(positives), torch.stack(negatives)
 
 
-def get_embeddings(model, images, name):
-    if name == "simple":
-        features = model["features"](images).permute(0, 2, 3, 1).flatten(1)
-        output = model["head"](features)
-    else:
-        output = model(images)
-    return F.normalize(output, dim=1)
+def get_embeddings(model, images):
+    return F.normalize(model(images), dim=1)
 
 
 def triplet_loss(a, p, n, margin=0.2):
@@ -105,7 +100,7 @@ def run_epoch(model, name, triplets, config, device, optimizer=None, frozen=Fals
     with torch.set_grad_enabled(optimizer is not None):
         for a, p, n in get_batches(triplets, config["image_size"], config["batch_size"], name not in {"simple", "complex"}):
             images = torch.cat([a, p, n]).to(device)
-            ea, ep, en = get_embeddings(model, images, name).chunk(3)
+            ea, ep, en = get_embeddings(model, images).chunk(3)
             loss = triplet_loss(ea, ep, en, config["margin"])
             if optimizer is not None:
                 optimizer.zero_grad()
@@ -121,7 +116,7 @@ def pair_distances(model, name, triplets, config, device):
     distances, labels = [], []
     for a, p, n in get_batches(triplets, config["image_size"], config["batch_size"], name not in {"simple", "complex"}):
         images = torch.cat([a, p, n]).to(device)
-        ea, ep, en = get_embeddings(model, images, name).chunk(3)
+        ea, ep, en = get_embeddings(model, images).chunk(3)
         distances.extend([(ea - ep).square().sum(1).cpu().numpy(),
                           (ea - en).square().sum(1).cpu().numpy()])
         labels.extend([np.ones(len(a)), np.zeros(len(a))])
@@ -172,7 +167,7 @@ def test_pair_distances(model, name, pairs, config, device):
     for start in range(0, len(paths), batch_size):
         batch = paths[start:start + batch_size]
         images = torch.stack([load_image(path, transform, rgb) for path in batch]).to(device)
-        vectors = get_embeddings(model, images, name).cpu().numpy()
+        vectors = get_embeddings(model, images).cpu().numpy()
         embeddings.update(zip(batch, vectors))
     distances = [np.sum((embeddings[reference] - embeddings[query]) ** 2) for reference, query, label in pairs]
     labels = [label for reference, query, label in pairs]
